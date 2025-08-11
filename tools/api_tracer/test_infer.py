@@ -86,7 +86,12 @@ def run_inference_test_tg(model_name: str):
     model_path = MODELS_DIR / model_name
     output_path = f"tools/api_tracer/trace_output_test_infer/{model_name}"
     tracer = APITracer(
-        "torch", output_path=output_path, levels=[0, 1], merge_output=True
+        "torch",
+        output_path=output_path,
+        levels=[0, 1],
+        merge_output=True,
+        record_stack=True,
+        stack_format="full",
     )
     tracer.start()
 
