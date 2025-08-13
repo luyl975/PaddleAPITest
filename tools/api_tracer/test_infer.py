@@ -17,7 +17,8 @@ from PIL import Image
 from torchvision.transforms.functional import InterpolationMode
 from transformers import (AutoModel, AutoModelForCausalLM,
                           AutoModelForImageTextToText, AutoProcessor,
-                          AutoTokenizer)
+                          AutoTokenizer, JanusForConditionalGeneration, JanusProcessor)
+
 
 TextGenerationMODELS = [
     # "Qwen/Qwen2-0.5B",
@@ -74,7 +75,7 @@ Imageto3DModels = [
 ]
 
 AnytoAnyModels = [
-    # "deepseek-ai/Janus-Pro-1B",
+     "/root/paddlejob/workspace/env_run/models/deepseek-ai/Janus-Pro-1B",
     # "ByteDance-Seed/BAGEL-7B-MoT",
 ]
 
@@ -451,41 +452,70 @@ def run_inference_test_a2a(model_name: str):
     )
 
     try:
-        model = AutoModelForCausalLM.from_pretrained(
-            model_name,
-            torch_dtype=torch.bfloat16,
-            device_map="auto",
-            trust_remote_code=True,
-        ).eval()
-        processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True)
-
-        print(f"Model Class: {model.__class__}")
-        print(f"Processor Class: {processor.__class__}")
-
-        with open(os.path.join(output_path, "model_info.txt"), "w") as f:
-            f.write(f"Model: {model.__class__}\n")
-            f.write(f"Processor: {processor.__class__}\n")
-
         prompt = "Describe the object in the image."
         image = Image.open("tools/api_tracer/sample_image.jpg")
+        if "deepseek-ai/Janus-Pro" in model_name:
+            messages = [
+                {
+                    "role": "user",
+                    "content": [
+                        {'type':'image', 'url': 'http://images.cocodataset.org/val2017/000000039769.jpg'},
+                        {'type':"text", "text":"What do you see in this image?."}
+                    ]
+                },
+            ]
 
-        messages = [
-            {
-                "role": "user",
-                "content": [{"type": "image"}, {"type": "text", "text": prompt}],
-            }
-        ]
-        text_prompt = processor.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True
-        )
-        inputs = processor(text=text_prompt, images=image, return_tensors="pt").to(
-            "cuda", dtype=torch.bfloat16
-        )
+            # Set generation mode to `text` to perform text generation.
+            processor = AutoProcessor.from_pretrained(model_name)
+            model = JanusForConditionalGeneration.from_pretrained(model_name,
+                    torch_dtype=torch.bfloat16,
+                    device_map="auto")
 
-        with torch.no_grad() and tracer:
-            outputs = model.generate(**inputs, max_new_tokens=100)
+            inputs = processor.apply_chat_template(
+                messages,
+                add_generation_prompt=True,
+                generation_mode="text",
+                tokenize=True,
+                return_dict=True,
+                return_tensors="pt",
+            ).to(model.device, dtype=torch.bfloat16)
+            with torch.no_grad(), torch.inference_mode(), tracer:
+                output = model.generate(**inputs, max_new_tokens=40,generation_mode='text',do_sample=True)
+            text = processor.decode(output[0], skip_special_tokens=True)
 
-        response = processor.batch_decode(outputs, skip_special_tokens=True)[0].strip()
+        else:
+            model = AutoModelForCausalLM.from_pretrained(
+                model_name,
+                torch_dtype=torch.bfloat16,
+                device_map="auto",
+                trust_remote_code=True,
+            ).eval()
+            processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True)
+
+            print(f"Model Class: {model.__class__}")
+            print(f"Processor Class: {processor.__class__}")
+
+            with open(os.path.join(output_path, "model_info.txt"), "w") as f:
+                f.write(f"Model: {model.__class__}\n")
+                f.write(f"Processor: {processor.__class__}\n")
+
+            messages = [
+                {
+                    "role": "user",
+                    "content": [{"type": "image"}, {"type": "text", "text": prompt}],
+                }
+            ]
+            text_prompt = processor.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=True
+            )
+            inputs = processor(text=text_prompt, images=image, return_tensors="pt").to(
+                "cuda", dtype=torch.bfloat16
+            )
+
+            with torch.no_grad() and tracer:
+                outputs = model.generate(**inputs, max_new_tokens=100)
+
+            response = processor.batch_decode(outputs, skip_special_tokens=True)[0].strip()
 
         print("\n--- Generated Response ---")
         print(response)
