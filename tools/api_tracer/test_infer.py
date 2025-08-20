@@ -584,7 +584,7 @@ def run_inference_test_a2a(model_name: str):
                 language_model = Qwen2ForCausalLM(llm_config)
                 vit_model      = SiglipVisionModel(vit_config)
                 model          = Bagel(language_model, vit_model, config)
-                model.vit_model.vision_model.embeddings.convert_conv2d_to_linear(vit_config, meta=True)
+                model.vit_model.vision_model.embeddings.convert_conv2d_to_linear(vit_config)
 
             # Tokenizer Preparing
             tokenizer = Qwen2Tokenizer.from_pretrained(model_path)
@@ -669,7 +669,7 @@ def run_inference_test_a2a(model_name: str):
                 cfg_img_scale=1.0,
                 cfg_interval=[0.4, 1.0],
                 timestep_shift=3.0,
-                num_timesteps=25,
+                num_timesteps=5,
                 cfg_renorm_min=0.0,
                 cfg_renorm_type="global",
             )
