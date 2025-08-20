@@ -544,14 +544,28 @@ def run_inference_test_a2a(model_name: str):
                 {"role": "<|Assistant|>", "content": ""},
             ]
 
-            # Set generation mode to `text` to perform text generation.
-            processor = AutoProcessor.from_pretrained(model_name)
-            model = JanusForConditionalGeneration.from_pretrained(model_name,
-                    torch_dtype=torch.bfloat16,
-                    device_map="auto")
-            with torch.no_grad(), torch.inference_mode(), tracer:
-                output = model.generate(**inputs, max_new_tokens=40,generation_mode='text',do_sample=True)
-            text = processor.decode(output[0], skip_special_tokens=True)
+            # load images and prepare for inputs
+            pil_images = load_pil_images(conversation)
+            prepare_inputs = vl_chat_processor(
+                conversations=conversation, images=pil_images, force_batchify=True
+            ).to(vl_gpt.device)
+
+            # # run image encoder to get the image embeddings
+            inputs_embeds = vl_gpt.prepare_inputs_embeds(**prepare_inputs)
+
+            # # run the model to get the response
+            outputs = vl_gpt.language_model.generate(
+                inputs_embeds=inputs_embeds,
+                attention_mask=prepare_inputs.attention_mask,
+                pad_token_id=tokenizer.eos_token_id,
+                bos_token_id=tokenizer.bos_token_id,
+                eos_token_id=tokenizer.eos_token_id,
+                max_new_tokens=512,
+                do_sample=False,
+                use_cache=True,
+            )
+
+            answer = tokenizer.decode(outputs[0].cpu().tolist(), skip_special_tokens=True)
         elif "BAGEL-7B-MoT" in model_name:
             # LLM config preparing
             llm_config = Qwen2Config.from_json_file(os.path.join(model_path, "llm_config.json"))
