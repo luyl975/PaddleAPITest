@@ -465,6 +465,9 @@ class PyTorchDialect(FrameworkDialect):
         "torch.nn.parallel.DistributedDataParallel._get_active_ddp_module",  # it will stuck RWKV
         "torch.nn.Module.get_extra_state",  # it will cause RuntimeError, and be overridden by subclass of Module
         "torch.nn.Module.set_extra_state",  # it will cause RuntimeError, and be overridden by subclass of Module
+        "torch.nn.Module._load_from_state_dict",  # it will cause errors, and be overridden by subclass of Module
+        "torch.nn.Module.load_state_dict",  # it will cause errors, and be overridden by subclass of Module
+        "torch.Tensor.data.__set__",  # it will cause RuntimeError, when calling `variable.set_data(tensor)`
     }
 
     def get_framework_name(self) -> str:
@@ -551,6 +554,8 @@ class PyTorchDialect(FrameworkDialect):
                                 "profile_hook_step",
                                 "get_extra_state",
                                 "set_extra_state",
+                                "load_state_dict",
+                                "_load_from_state_dict",
                             }:
                                 continue
                             if isinstance(

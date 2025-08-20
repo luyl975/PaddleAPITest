@@ -4,7 +4,7 @@ from pathlib import Path
 
 import yaml
 
-INPUT_DIR = Path("tools/api_tracer/trace_output_test_train/Qwen/Qwen3-0.6B")
+INPUT_DIR = Path("tools/api_tracer/trace_output_test_train/black-forest-labs/FLUX.1-dev")
 
 
 def parse_api(api):
