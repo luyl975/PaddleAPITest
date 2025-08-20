@@ -493,6 +493,9 @@ def run_inference_test_a2a(model_name: str):
     tracer.start()
 
     try:
+        with open(os.path.join(output_path, "model_info.txt"), "w") as f:
+            f.write(f"Model: {model.__class__}\n")
+            f.write(f"Processor: {processor.__class__}\n")
         prompt = "Describe the object in the image."
         image = Image.open("tools/api_tracer/sample_image.jpg")
         if "deepseek-ai/Janus-Pro" in model_name:
@@ -511,19 +514,9 @@ def run_inference_test_a2a(model_name: str):
             model = JanusForConditionalGeneration.from_pretrained(model_name,
                     torch_dtype=torch.bfloat16,
                     device_map="auto")
-
-            inputs = processor.apply_chat_template(
-                messages,
-                add_generation_prompt=True,
-                generation_mode="text",
-                tokenize=True,
-                return_dict=True,
-                return_tensors="pt",
-            ).to(model.device, dtype=torch.bfloat16)
             with torch.no_grad(), torch.inference_mode(), tracer:
                 output = model.generate(**inputs, max_new_tokens=40,generation_mode='text',do_sample=True)
             text = processor.decode(output[0], skip_special_tokens=True)
-
         else:
             model = AutoModelForCausalLM.from_pretrained(
                 model_name,
